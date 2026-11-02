@@ -1,7 +1,7 @@
 // Le « coach » : récupération par muscle, cibles du jour, construction et ordre de la séance, charges proposées.
 // Fonctions pures (pas d'accès base) : testées dans tests/coach.test.ts.
 import { CIBLES, LISTE_CIBLES, LISTE_MUSCLES, MUSCLES, type CibleId, type Muscle } from "./muscles.ts";
-import { EXERCICES, EXERCICES_PAR_ID, type Exercice, type Materiel } from "./exercices.ts";
+import { EXERCICES, EXERCICES_PAR_ID, disponible, type Equipement, type Exercice } from "./exercices.ts";
 
 // ------------------------------------------------------------------ types
 
@@ -177,8 +177,8 @@ function derniereSeanceCible(historique: SeanceHisto[], cible: string): SeanceHi
 }
 
 /** Choisit les exercices d'une séance (sans les ordonner). */
-export function choisirExercices(cible: CibleId, historique: SeanceHisto[], materiel: Materiel[]): Exercice[] {
-  const ok = (e: Exercice) => materiel.includes(e.materiel);
+export function choisirExercices(cible: CibleId, historique: SeanceHisto[], equipement: Equipement[]): Exercice[] {
+  const ok = (e: Exercice) => disponible(e, equipement);
   const choisis: Exercice[] = [];
   const familles = new Set<string>();
   const dejaFaits = new Set((derniereSeanceCible(historique, cible)?.exercices ?? []).map((x) => x.exerciceId));
@@ -249,8 +249,8 @@ export function raisonOrdre(e: Exercice, index: number, avant: Exercice[]): stri
 }
 
 /** Séance complète prête à suivre. */
-export function genererSeance(cible: CibleId, historique: SeanceHisto[], materiel: Materiel[]): PlanExo[] {
-  const exos = ordonner(choisirExercices(cible, historique, materiel));
+export function genererSeance(cible: CibleId, historique: SeanceHisto[], equipement: Equipement[]): PlanExo[] {
+  const exos = ordonner(choisirExercices(cible, historique, equipement));
   return exos.map((e, i) => planPour(e, historique, i, exos.slice(0, i)));
 }
 
@@ -261,10 +261,10 @@ export function planPour(e: Exercice, historique: SeanceHisto[], index = 0, avan
 }
 
 /** Exercices de remplacement pour le même muscle, les plus proches d'abord. */
-export function alternatives(exerciceId: string, dejaDansSeance: string[], materiel: Materiel[]): Exercice[] {
+export function alternatives(exerciceId: string, dejaDansSeance: string[], equipement: Equipement[]): Exercice[] {
   const e = EXERCICES_PAR_ID[exerciceId];
   if (!e) return [];
-  return EXERCICES.filter((x) => x.cible === e.cible && x.id !== e.id && !dejaDansSeance.includes(x.id) && materiel.includes(x.materiel))
+  return EXERCICES.filter((x) => x.cible === e.cible && x.id !== e.id && !dejaDansSeance.includes(x.id) && disponible(x, equipement))
     .sort((a, b) => Math.abs(a.niveau - e.niveau) - Math.abs(b.niveau - e.niveau) || b.pref - a.pref);
 }
 

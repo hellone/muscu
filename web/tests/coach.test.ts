@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { genererSeance, proposerSeries, recuperation, suggestions, alternatives, type SeanceHisto } from "../lib/coach.ts";
-import { EXERCICES, EXERCICES_PAR_ID, PROFILS_MATERIEL } from "../lib/exercices.ts";
+import { EXERCICES, EXERCICES_PAR_ID, LISTE_EQUIPEMENTS, besoins, type Equipement } from "../lib/exercices.ts";
 import { LISTE_CIBLES, MUSCLES } from "../lib/muscles.ts";
 import fs from "node:fs";
 
-const SALLE = PROFILS_MATERIEL.salle.materiel;
+const SALLE = LISTE_EQUIPEMENTS;
 const J = 86400_000;
 const maintenant = Date.parse("2026-11-02T18:00:00Z");
 const ilYa = (j: number) => new Date(maintenant - j * J).toISOString();
@@ -45,12 +45,23 @@ test("pecs : développé couché avant les dips, triceps isolés en dernier", ()
   assert.equal(EXERCICES_PAR_ID[ids[ids.length - 1]].cible, "triceps");
 });
 
-test("matériel maison : aucune machine ni poulie", () => {
+test("maison avec haltères seulement : jamais de barre, banc, machine, poulie ni barre de traction", () => {
+  const dispo: Equipement[] = ["halteres"];
   for (const c of LISTE_CIBLES) {
-    for (const p of genererSeance(c.id, [], PROFILS_MATERIEL.maison.materiel)) {
-      assert.ok(!["machine", "poulie"].includes(EXERCICES_PAR_ID[p.exerciceId].materiel));
+    const plan = genererSeance(c.id, [], dispo);
+    console.log(`  haltères/${c.id}:`, plan.map((p) => p.exerciceId).join(" > "));
+    assert.ok(plan.length >= 2, `${c.id}: séance trop courte`);
+    for (const p of plan) {
+      const b = besoins(EXERCICES_PAR_ID[p.exerciceId]);
+      assert.ok(b.every((x) => dispo.includes(x)), `${c.id}: ${p.exerciceId} demande ${b}`);
     }
   }
+  assert.ok(!genererSeance("pecs_triceps", [], dispo).some((p) => p.exerciceId === "dc-barre"));
+});
+
+test("haltères + banc : développé couché aux haltères proposé", () => {
+  const ids = genererSeance("pecs_triceps", [], ["halteres", "banc"]).map((p) => p.exerciceId);
+  assert.equal(ids[0], "dc-halteres");
 });
 
 test("récupération : jambes faites hier → pas prêtes ; il y a 4 jours → prêtes", () => {
@@ -90,7 +101,7 @@ test("double progression", () => {
 });
 
 test("alternatives : même muscle, pas déjà dans la séance", () => {
-  const alt = alternatives("dc-barre", ["di-halteres"], SALLE);
+  const alt = alternatives("dc-barre", ["di-halteres"], SALLE as Equipement[]);
   assert.ok(alt.length > 3);
   assert.ok(alt.every((e) => e.cible === "pectoraux" && e.id !== "di-halteres"));
 });

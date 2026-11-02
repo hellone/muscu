@@ -1,7 +1,7 @@
 "use client";
 // Côté téléphone : appels API, séance en cours (gardée sur le téléphone, marche hors-ligne) et envois en attente.
 import { useSyncExternalStore } from "react";
-import type { PlanExo, SerieFaite } from "./coach";
+import type { PlanExo, SeanceHisto, SerieFaite } from "./coach";
 import { EXERCICES_PAR_ID } from "./exercices";
 
 export class ErreurApi extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -25,7 +25,8 @@ export async function api<T = any>(url: string, init: RequestInit & { json?: unk
 
 export interface SerieLocale { poids: number | null; reps: number; fait: boolean }
 export interface ExoLocal extends Omit<PlanExo, "series"> { series: SerieLocale[] }
-export interface SeanceLocale { id: string; cible: string; nomCible: string; debut: string; exos: ExoLocal[]; actif: number }
+/** passee = séance saisie après coup (pas de minuteur, pas de durée) ; modif = correction d'une séance déjà enregistrée. */
+export interface SeanceLocale { id: string; cible: string; nomCible: string; debut: string; exos: ExoLocal[]; actif: number; passee?: boolean; modif?: boolean }
 
 const CLE = "muscu.seance";
 const CLE_ENVOIS = "muscu.envois";
@@ -70,13 +71,36 @@ export function nouvelId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function demarrerSeance(cible: string, nomCible: string, plan: PlanExo[]) {
+export function demarrerSeance(cible: string, nomCible: string, plan: PlanExo[], debut?: string) {
+  const d = debut ?? new Date().toISOString();
   ecrireSeance({
-    id: nouvelId(), cible, nomCible, debut: new Date().toISOString(), actif: 0,
+    id: nouvelId(), cible, nomCible, debut: d, actif: plan.length ? 0 : -1, passee: estPassee(d),
     exos: plan.map((p) => ({ ...p, series: p.series.map((s) => ({ ...s, fait: false })) })),
   });
   prechargerVisuels(plan.map((p) => p.exerciceId));
 }
+
+/** Une séance commencée il y a plus de 3 h est considérée comme saisie après coup. */
+export const estPassee = (iso: string) => Date.now() - Date.parse(iso) > 3 * 3600_000;
+
+/** Recharge une séance enregistrée pour la corriger (même id : elle sera remplacée à l'enregistrement). */
+export function modifierSeanceEnregistree(s: SeanceHisto, nomCible: string) {
+  ecrireSeance({
+    id: s.id, cible: s.cible, nomCible, debut: s.debut, actif: -1, passee: true, modif: true,
+    exos: s.exercices.map((e) => ({
+        exerciceId: e.exerciceId, raison: "", objectif: "", derniere: null, repos: 90,
+        series: e.series.map((x) => ({ poids: x.poids, reps: x.reps, fait: true })),
+    })),
+  });
+}
+
+/** Conversions pour les champs date/heure du navigateur (heure locale). */
+export function versChampDate(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+export const depuisChampDate = (v: string) => new Date(v).toISOString();
 
 /** Télécharge à l'avance les visuels et fiches de la séance (pour les avoir en salle, même sans réseau). */
 export function prechargerVisuels(ids: string[]) {
@@ -90,11 +114,11 @@ export function prechargerVisuels(ids: string[]) {
 
 // ------------------------------------------------------------ envoi (avec file d'attente hors-ligne)
 
-interface SeanceEnvoi { id: string; cible: string; debut: string; fin: string; exercices: { exerciceId: string; series: SerieFaite[] }[] }
+interface SeanceEnvoi { id: string; cible: string; debut: string; fin?: string; exercices: { exerciceId: string; series: SerieFaite[] }[] }
 
 export function versEnvoi(s: SeanceLocale): SeanceEnvoi {
   return {
-    id: s.id, cible: s.cible, debut: s.debut, fin: new Date().toISOString(),
+    id: s.id, cible: s.cible, debut: s.debut, fin: s.passee ? undefined : new Date().toISOString(),
     exercices: s.exos.map((e) => ({ exerciceId: e.exerciceId, series: e.series.filter((x) => x.fait && x.reps > 0).map(({ poids, reps }) => ({ poids, reps })) }))
       .filter((e) => e.series.length),
   };

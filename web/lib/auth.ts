@@ -3,12 +3,12 @@ import "server-only";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { db } from "./db";
-import type { ProfilMateriel } from "./exercices";
+import { lireEquipement, type Equipement } from "./exercices";
 
 export const COOKIE_SESSION = "mu_session";
 const DUREE_SESSION_JOURS = 365;
 
-export interface Utilisateur { id: number; identifiant: string; nom: string; materiel: ProfilMateriel }
+export interface Utilisateur { id: number; identifiant: string; nom: string; equipement: Equipement[] }
 
 export class ErreurMetier extends Error {}
 
@@ -46,7 +46,7 @@ export function effacerEchecs(cle: string) { essais.delete(cle); }
 
 // ------------------------------------------------------------ comptes
 
-const ligneVersUtilisateur = (r: Record<string, any>): Utilisateur => ({ id: r.id, identifiant: r.identifiant, nom: r.nom, materiel: r.materiel });
+const ligneVersUtilisateur = (r: Record<string, any>): Utilisateur => ({ id: r.id, identifiant: r.identifiant, nom: r.nom, equipement: lireEquipement(r.materiel) });
 
 /** Code d'invitation demandé à l'inscription (variable CODE_INVITATION). Vide = inscription libre. */
 export const codeInvitationRequis = () => !!process.env.CODE_INVITATION?.trim();
@@ -61,7 +61,7 @@ export function creerCompte(identifiant: string, nom: string, mdp: string, code?
   if (mdp.length < 8) throw new ErreurMetier("Mot de passe : 8 caractères minimum.");
   if (db().prepare("SELECT 1 FROM utilisateurs WHERE identifiant = ?").get(ident)) throw new ErreurMetier("Cet identifiant est déjà pris.");
   const r = db().prepare("INSERT INTO utilisateurs (identifiant, nom, mdp_hash) VALUES (?,?,?)").run(ident, n, hacherMdp(mdp));
-  return { id: Number(r.lastInsertRowid), identifiant: ident, nom: n, materiel: "salle" };
+  return { id: Number(r.lastInsertRowid), identifiant: ident, nom: n, equipement: lireEquipement("salle") };
 }
 
 export function ouvrirSession(utilisateurId: number, appareil?: string): string {

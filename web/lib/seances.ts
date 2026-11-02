@@ -27,6 +27,7 @@ export function enregistrer(utilisateurId: number, s: SeanceRecue) {
   if (typeof s?.id !== "string" || !/^[a-zA-Z0-9-]{8,64}$/.test(s.id)) throw new ErreurMetier("Séance invalide.");
   if (!(s.cible in CIBLES) && s.cible !== "libre") throw new ErreurMetier("Cible inconnue.");
   if (typeof s.debut !== "string" || !ISO.test(s.debut)) throw new ErreurMetier("Date invalide.");
+  if (Date.parse(s.debut) > Date.now() + 86400_000) throw new ErreurMetier("La date de la séance est dans le futur.");
   if (!Array.isArray(s.exercices) || s.exercices.length > 40) throw new ErreurMetier("Exercices invalides.");
   const exos = s.exercices
     .filter((e) => EXERCICES_PAR_ID[e?.exerciceId])

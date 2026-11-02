@@ -14,19 +14,19 @@ export default function Accueil() {
   const seance = useSeance();
   const [coach, setCoach] = useState<Coach | null>(null);
   const [erreur, setErreur] = useState("");
-  const [lancement, setLancement] = useState<CibleId | null>(null);
+  const [lancement, setLancement] = useState<CibleId | "libre" | null>(null);
   const [toutes, setToutes] = useState(false);
 
   useEffect(() => {
     api<Coach>("/api/coach").then(setCoach).catch((e) => setErreur(e.message));
   }, []);
 
-  async function lancer(cible: CibleId) {
+  async function lancer(cible: CibleId | "libre") {
     if (lireSeance() && !confirm("Une séance est déjà en cours. La remplacer ?")) return;
     setLancement(cible);
     try {
       const r = await api<{ plan: PlanExo[] }>("/api/coach/seance", { method: "POST", json: { cible } });
-      demarrerSeance(cible, CIBLES[cible].nom, r.plan);
+      demarrerSeance(cible, cible === "libre" ? "Séance libre" : CIBLES[cible].nom, r.plan);
       router.push("/seance");
     } catch (e) {
       setErreur((e as Error).message);
@@ -84,6 +84,7 @@ export default function Accueil() {
                     {s.nom} <small>{s.recup}%</small>
                   </button>
                 ))}
+                <button className="puce" onClick={() => lancer("libre")} disabled={!!lancement}>Séance libre</button>
               </div>
             )}
           </>

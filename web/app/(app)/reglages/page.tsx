@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
-import { PROFILS_MATERIEL, type ProfilMateriel } from "@/lib/exercices";
+import { EQUIPEMENTS, LISTE_EQUIPEMENTS, PRESETS, type Equipement } from "@/lib/exercices";
 
-interface Moi { identifiant: string; nom: string; materiel: ProfilMateriel }
+interface Moi { identifiant: string; nom: string; equipement: Equipement[] }
 
 export default function Reglages() {
   const [moi, setMoi] = useState<Moi | null>(null);
@@ -11,11 +11,16 @@ export default function Reglages() {
   const [mdp, setMdp] = useState({ ancien: "", nouveau: "" });
   useEffect(() => { api<Moi>("/api/compte").then(setMoi).catch(() => {}); }, []);
 
-  async function materiel(m: ProfilMateriel) {
-    await api("/api/compte", { method: "PATCH", json: { materiel: m } });
-    setMoi((x) => (x ? { ...x, materiel: m } : x));
-    setMsg("Matériel enregistré : les prochaines séances en tiendront compte.");
+  async function enregistrer(equipement: Equipement[]) {
+    setMoi((x) => (x ? { ...x, equipement } : x));
+    try {
+      await api("/api/compte", { method: "PATCH", json: { equipement } });
+      setMsg("Matériel enregistré : les prochaines séances en tiendront compte.");
+    } catch (e) { setMsg((e as Error).message); }
   }
+  const basculer = (k: Equipement) => moi && enregistrer(moi.equipement.includes(k) ? moi.equipement.filter((x) => x !== k) : [...moi.equipement, k]);
+  const memes = (a: Equipement[], b: Equipement[]) => a.length === b.length && a.every((x) => b.includes(x));
+
   async function changerMdp(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -35,11 +40,17 @@ export default function Reglages() {
       {msg && <p className="info">{msg}</p>}
       <section className="carte">
         <h2 className="titre-section">Mon matériel</h2>
+        <p className="discret" style={{ marginBottom: 10 }}>Coche ce que tu as : je ne proposerai que des exercices faisables avec. Les exercices au poids du corps (pompes, gainage…) sont toujours possibles.</p>
+        <div className="puces" style={{ marginTop: 0, marginBottom: 12 }}>
+          {PRESETS.map((p) => (
+            <button key={p.nom} className={`puce ${moi && memes(moi.equipement, p.equipement) ? "active" : ""}`} onClick={() => enregistrer(p.equipement)}>{p.nom}</button>
+          ))}
+        </div>
         <div className="options">
-          {(Object.keys(PROFILS_MATERIEL) as ProfilMateriel[]).map((k) => (
-            <label key={k} className={moi?.materiel === k ? "coche" : ""}>
-              <input type="radio" name="materiel" checked={moi?.materiel === k} onChange={() => materiel(k)} />
-              {PROFILS_MATERIEL[k].nom}
+          {LISTE_EQUIPEMENTS.map((k) => (
+            <label key={k} className={moi?.equipement.includes(k) ? "coche" : ""}>
+              <input type="checkbox" checked={!!moi?.equipement.includes(k)} onChange={() => basculer(k)} />
+              {EQUIPEMENTS[k]}
             </label>
           ))}
         </div>
