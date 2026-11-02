@@ -1,0 +1,28 @@
+# Muscu - déploiement sur le VPS, derrière le Traefik de n8n (HTTPS automatique), comme Courtside.
+# Prérequis : fichier .env à côté de ce fichier (voir .env.example).
+# Lancement / mise à jour : ./deploy.sh
+services:
+  web:
+    build: ./web
+    container_name: muscu-web
+    restart: unless-stopped
+    environment:
+      - MUSCU_DATA=/data
+      - CODE_INVITATION=${CODE_INVITATION:-}
+    volumes:
+      - ./data:/data          # base de données (comptes, séances) : à sauvegarder
+    mem_limit: 384m
+    networks:
+      - n8n_default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=n8n_default
+      - traefik.http.routers.muscu.rule=Host(`${MUSCU_DOMAIN:-muscu.courtside-basket.fr}`)
+      - traefik.http.routers.muscu.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.muscu.tls=true
+      - traefik.http.routers.muscu.tls.certresolver=${TRAEFIK_CERTRESOLVER:-mytlschallenge}
+      - traefik.http.services.muscu.loadbalancer.server.port=3000
+
+networks:
+  n8n_default:
+    external: true

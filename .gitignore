@@ -1,0 +1,14 @@
+# Dépendances et builds
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets et données (ne jamais publier)
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-wal
+*.db-shm
