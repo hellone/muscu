@@ -1,95 +1,93 @@
-// Schéma du corps (face + dos) avec les muscles colorés.
-// mode "exo" : principaux en couleur pleine, secondaires en clair.
-// mode "recup" : rouge = fatigué, orange = en cours, vert = récupéré.
+"use client";
+// Schéma du corps : rendus 3D (face / dos) avec les muscles colorés par-dessus.
+// Les couleurs sont fusionnées en « produit » avec le rendu : le relief de la sculpture reste visible.
+// mode exercice : principaux en couleur pleine, secondaires en clair.
+// mode récupération : rouge = fatigué, orange = en cours, vert = récupéré, rien = jamais travaillé.
+import { useId, useState } from "react";
 import type { Muscle } from "@/lib/muscles";
 
-type Forme = { d?: string; e?: [number, number, number, number, number?] }; // e = ellipse cx, cy, rx, ry, rotation
+type Forme = { d?: string; e?: number[] }; // e = ellipse [cx, cy, rx, ry, rotation]
+type Vue = "face" | "dos";
 
-/** Formes côté gauche du schéma (le côté droit est obtenu par symétrie autour de x = 60). */
-const FACE: Partial<Record<Muscle, Forme[]>> = {
-  trapezes: [{ d: "M53 37 C50 41 46 43 41 45 L52 45 Z" }],
-  epaules_ant: [{ e: [40, 52, 6.5, 8, -15] }],
-  epaules_lat: [{ d: "M33 47 C30 50 29 56 31 61 L35 58 C34 54 35 50 37 47 Z" }],
-  pectoraux: [{ d: "M58.5 47 C51 45.5 44 47 41.5 54 C41 61 47 66.5 58.5 65 Z" }],
-  biceps: [{ e: [34.5, 73, 4.6, 10.5, 8] }],
-  avant_bras: [{ e: [30.5, 98, 4.2, 12, 9] }],
-  abdos: [
-    { d: "M52 69 h7 v9 h-7 Z" }, { d: "M52 80 h7 v9 h-7 Z" }, { d: "M52.5 91 h6.5 v10 h-6 Z" },
-    { d: "M46 70 C44 80 45 92 48 104 L51 103 L51 70 Z" },
-  ],
-  quadriceps: [{ e: [50.5, 147, 8.2, 24, 3] }],
-  adducteurs: [{ e: [57, 136, 2.6, 13, -4] }],
-  mollets: [{ e: [47.5, 204, 4.2, 14, 2] }],
+/** Zones dessinées sur la moitié gauche de l'image ; l'autre moitié est obtenue par symétrie autour de `axe`. */
+const VUES: Record<Vue, { w: number; h: number; axe: number; zones: Partial<Record<Muscle, Forme[]>> }> = {
+  face: {
+    w: 803, h: 879, axe: 399,
+    zones: {
+      trapezes: [{ d: "M384 110 C373 127 356 136 332 143 L362 149 C374 141 383 132 386 122 Z" }],
+      epaules_ant: [{ e: [302, 182, 17, 32, 15] }],
+      epaules_lat: [{ e: [281, 168, 14, 25, 32] }],
+      pectoraux: [{ d: "M397 150 C370 145 332 150 312 175 C303 200 311 228 336 238 C361 245 385 240 397 232 Z" }],
+      biceps: [{ e: [246, 205, 40, 15, -31] }],
+      avant_bras: [{ e: [146, 252, 50, 13, -18] }],
+      abdos: [{ d: "M373 238 L399 236 L399 342 L369 340 Z" }, { d: "M352 242 C336 262 331 300 341 334 L363 338 L361 246 Z" }],
+      quadriceps: [{ e: [348, 490, 42, 104, 3] }],
+      adducteurs: [{ e: [385, 462, 11, 44, -8] }],
+      mollets: [{ e: [326, 680, 20, 48, 4] }],
+    },
+  },
+  dos: {
+    w: 766, h: 871, axe: 383,
+    zones: {
+      trapezes: [{ d: "M383 92 L361 100 L311 140 L346 175 L371 255 L383 275 Z" }],
+      epaules_post: [{ e: [291, 176, 22, 28, -20] }],
+      epaules_lat: [{ e: [268, 165, 14, 25, 30] }],
+      haut_dos: [{ d: "M372 182 L345 172 C325 180 313 200 318 225 L362 240 Z" }],
+      dorsaux: [{ d: "M373 247 L318 230 C296 246 292 280 305 300 C325 320 350 330 376 336 Z" }],
+      lombaires: [{ d: "M366 298 L383 296 L383 372 L360 369 C362 345 363 320 366 298 Z" }],
+      triceps: [{ e: [236, 205, 38, 15, -33] }],
+      avant_bras: [{ e: [146, 248, 50, 13, -20] }],
+      fessiers: [{ e: [342, 425, 42, 45, 0] }],
+      ischios: [{ e: [338, 545, 35, 75, 3] }],
+      adducteurs: [{ e: [370, 505, 9, 35, 0] }],
+      mollets: [{ e: [318, 680, 32, 60, 0] }],
+    },
+  },
 };
 
-const DOS: Partial<Record<Muscle, Forme[]>> = {
-  trapezes: [{ d: "M60 33 L60 76 L55 70 L50 50 L41 45 C48 43 54 39 57 33 Z" }],
-  epaules_post: [{ e: [40, 52, 6.5, 8, 15] }],
-  epaules_lat: [{ d: "M33 47 C30 50 29 56 31 61 L35 58 C34 54 35 50 37 47 Z" }],
-  haut_dos: [{ d: "M50.5 52 L44 56 L45.5 66 L55 69 Z" }],
-  dorsaux: [{ d: "M55.5 71 L45 67 C41 74 42 86 46 94 C50 98 54 100 58 101 Z" }],
-  lombaires: [{ d: "M59 98 C55 98 52 100 51 103 L51 113 L59 113 Z" }],
-  triceps: [{ e: [34.5, 72, 4.8, 11, 8] }],
-  avant_bras: [{ e: [30.5, 98, 4.2, 12, 9] }],
-  fessiers: [{ e: [52.5, 123, 7.8, 8.8] }],
-  ischios: [{ e: [51, 155, 7.4, 21, 3] }],
-  adducteurs: [{ e: [57.5, 140, 2.4, 11, -4] }],
-  mollets: [{ e: [48, 199, 5.4, 14, 2] }],
-};
+/** Muscles qu'on ne voit (presque) que de dos : la vue de dos est choisie d'office pour eux. */
+const DE_DOS: Muscle[] = ["trapezes", "epaules_post", "haut_dos", "dorsaux", "lombaires", "triceps", "fessiers", "ischios"];
 
-function Silhouette() {
-  return (
-    <g className="corps-base">
-      <circle cx="60" cy="18" r="11" />
-      <path d="M54 27 h12 v9 h-12 Z" />
-      <path d="M40 43 C47 38 54 36 60 36 C66 36 73 38 80 43 L84 52 L80 106 L77 118 L43 118 L40 106 L36 52 Z" />
-      <path d="M38 48 L31 88" className="membre" strokeWidth="12" />
-      <path d="M31 88 L28 113" className="membre" strokeWidth="9" />
-      <circle cx="27.5" cy="118" r="4.5" />
-      <path d="M82 48 L89 88" className="membre" strokeWidth="12" />
-      <path d="M89 88 L92 113" className="membre" strokeWidth="9" />
-      <circle cx="92.5" cy="118" r="4.5" />
-      <path d="M51.5 117 L50 175" className="membre" strokeWidth="18" />
-      <path d="M50 177 L48.5 226" className="membre" strokeWidth="11" />
-      <path d="M68.5 117 L70 175" className="membre" strokeWidth="18" />
-      <path d="M70 177 L71.5 226" className="membre" strokeWidth="11" />
-      <path d="M44 229 h9 v4 h-11 Z M76 229 h-9 v4 h11 Z" />
-    </g>
-  );
+function Dessin({ f }: { f: Forme }) {
+  if (f.d) return <path d={f.d} />;
+  const [cx, cy, rx, ry, rot = 0] = f.e!;
+  return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} transform={rot ? `rotate(${rot} ${cx} ${cy})` : undefined} />;
 }
 
-function Formes({ formes, couleur, muscle }: { formes: Forme[]; couleur: (m: Muscle) => string | null; muscle: Muscle }) {
-  const c = couleur(muscle);
-  if (!c) return null;
+function Figure({ vue, couleur, id }: { vue: Vue; couleur: (m: Muscle) => string | null; id: string }) {
+  const v = VUES[vue];
+  const src = `/corps/${vue}.webp`;
+  const zones = (Object.keys(v.zones) as Muscle[]).map((m) => ({ m, c: couleur(m) })).filter((z) => z.c);
   return (
-    <g fill={c}>
-      {formes.map((f, i) => {
-        const el = f.d ? <path d={f.d} /> : <ellipse cx={f.e![0]} cy={f.e![1]} rx={f.e![2]} ry={f.e![3]} transform={f.e![4] ? `rotate(${f.e![4]} ${f.e![0]} ${f.e![1]})` : undefined} />;
-        return (
-          <g key={i}>
-            {el}
-            <g transform="translate(120 0) scale(-1 1)">{el}</g>
-          </g>
-        );
-      })}
-    </g>
-  );
-}
-
-function Vue({ formes, couleur, titre }: { formes: Partial<Record<Muscle, Forme[]>>; couleur: (m: Muscle) => string | null; titre: string }) {
-  return (
-    <svg viewBox="16 2 88 236" className="corps-vue" role="img" aria-label={titre}>
-      <Silhouette />
-      {(Object.keys(formes) as Muscle[]).map((m) => <Formes key={m} muscle={m} formes={formes[m]!} couleur={couleur} />)}
+    <svg viewBox={`0 0 ${v.w} ${v.h}`} className="corps-vue" role="img" aria-label={vue === "face" ? "Vue de face" : "Vue de dos"}>
+      <defs>
+        <mask id={`${id}-m`} style={{ maskType: "alpha" }}>
+          <image href={src} width={v.w} height={v.h} />
+        </mask>
+        <filter id={`${id}-f`}><feGaussianBlur stdDeviation="3" /></filter>
+      </defs>
+      <image href={src} width={v.w} height={v.h} />
+      <g mask={`url(#${id}-m)`} style={{ mixBlendMode: "multiply" }}>
+        <g filter={`url(#${id}-f)`} opacity={0.9}>
+          {zones.map(({ m, c }) => (
+            <g key={m} fill={c!.slice(0, 7)} fillOpacity={c!.length > 7 ? 0.5 : 1}>
+              {v.zones[m]!.map((f, i) => <Dessin key={i} f={f} />)}
+              <g transform={`translate(${2 * v.axe} 0) scale(-1 1)`}>
+                {v.zones[m]!.map((f, i) => <Dessin key={i} f={f} />)}
+              </g>
+            </g>
+          ))}
+        </g>
+      </g>
     </svg>
   );
 }
 
 export function couleurRecup(pct: number | undefined, connu: boolean): string | null {
-  if (pct === undefined || !connu) return "var(--muscle-neutre)";
-  if (pct < 50) return "var(--fatigue-forte)";
-  if (pct < 85) return "var(--fatigue-moyenne)";
-  return "var(--recupere)";
+  if (pct === undefined || !connu) return null;
+  if (pct < 50) return "#ff5a4e";
+  if (pct < 85) return "#ffb020";
+  return "#3ecf8e";
 }
 
 export default function Corps({
@@ -100,16 +98,29 @@ export default function Corps({
   recup?: Partial<Record<Muscle, { pct: number; derniere: string | null }>>;
   taille?: "normal" | "petit";
 }) {
+  const id = useId().replace(/:/g, "");
   const couleur = (m: Muscle): string | null => {
     if (recup) return couleurRecup(recup[m]?.pct, !!recup[m]?.derniere);
-    if (principaux.includes(m)) return "var(--accent)";
-    if (secondaires.includes(m)) return "var(--accent-doux)";
-    return "var(--muscle-neutre)";
+    if (principaux.includes(m)) return "#c6f432";
+    if (secondaires.includes(m)) return "#c6f43266";
+    return null;
   };
+  // vue par défaut : celle où se trouve le muscle principal de l'exercice
+  const parDefaut: Vue = !recup && principaux.length && DE_DOS.includes(principaux[0]) ? "dos" : "face";
+  const [vue, setVue] = useState<Vue>(parDefaut);
+  // pastille sur l'onglet de l'autre vue quand des muscles y sont colorés (fatigués en mode récupération)
+  const compte = (v: Vue) =>
+    (Object.keys(VUES[v].zones) as Muscle[]).filter((m) => (recup ? recup[m]?.derniere && recup[m]!.pct < 85 : principaux.includes(m))).length;
   return (
     <div className={`corps corps-${taille}`}>
-      <div><Vue formes={FACE} couleur={couleur} titre="Face" /><span>Face</span></div>
-      <div><Vue formes={DOS} couleur={couleur} titre="Dos" /><span>Dos</span></div>
+      <div className="corps-onglets" role="tablist">
+        {(["face", "dos"] as Vue[]).map((v) => (
+          <button key={v} role="tab" aria-selected={vue === v} className={vue === v ? "actif" : ""} onClick={() => setVue(v)}>
+            {v === "face" ? "Face" : "Dos"}{vue !== v && compte(v) > 0 && <i />}
+          </button>
+        ))}
+      </div>
+      <Figure vue={vue} couleur={couleur} id={`${id}-${vue}`} />
     </div>
   );
 }

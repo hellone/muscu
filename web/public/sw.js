@@ -2,7 +2,7 @@
 // - fichiers de l'appli et images d'exercices : cache d'abord (ils ne changent pas) ;
 // - pages et lectures d'API : réseau d'abord, dernière version gardée en secours ;
 // - envois (POST…) : jamais mis en cache (la file d'attente est gérée par l'appli).
-const VERSION = "muscu-v1";
+const VERSION = "muscu-v2";
 const STATIQUE = `${VERSION}-statique`;
 const DYNAMIQUE = `${VERSION}-dynamique`;
 
@@ -15,7 +15,7 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-const estStatique = (url) => url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/exos/") || /\.(png|svg|woff2?|ico)$/.test(url.pathname);
+const estStatique = (url) => url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/exos/") || /\.(png|svg|webp|jpg|woff2?|ico)$/.test(url.pathname);
 
 async function cacheDabord(req) {
   const cache = await caches.open(STATIQUE);

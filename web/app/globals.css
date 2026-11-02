@@ -7,7 +7,7 @@
   --texte-2: #9aa0ab;
   --accent: #c6f432;
   --accent-texte: #11140a;
-  --accent-doux: rgba(198, 244, 50, 0.38);
+  --accent-doux: rgba(198, 244, 50, 0.5);
   --muscle-neutre: #343944;
   --corps: #22252c;
   --fatigue-forte: #ff5a4e;
@@ -96,14 +96,13 @@ h1, h2, h3 { font-family: var(--titre); margin: 0; letter-spacing: 0.01em; }
 .barre div { height: 100%; background: var(--fatigue-moyenne); border-radius: 3px; }
 
 /* ------------------------------------------------------------ schéma du corps */
-.corps { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 340px; margin: 0 auto; }
-.corps-petit { max-width: 200px; }
-.corps > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.corps span { font-size: 11px; color: var(--texte-2); text-transform: uppercase; letter-spacing: 0.08em; }
-.corps-vue { width: 100%; height: auto; }
-.corps-base { fill: var(--corps); }
-.corps-base .membre { fill: none; stroke: var(--corps); stroke-linecap: round; }
-.corps-vue path, .corps-vue ellipse { transition: fill 0.3s; }
+.corps { position: relative; max-width: 420px; margin: 0 auto; }
+.corps-petit { max-width: 260px; }
+.corps-vue { display: block; width: 100%; height: auto; }
+.corps-onglets { position: absolute; top: 0; right: 0; z-index: 1; display: flex; background: var(--surface-2); border: 1px solid var(--bord); border-radius: 999px; padding: 3px; }
+.corps-onglets button { position: relative; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--texte-2); }
+.corps-onglets button.actif { background: var(--accent); color: var(--accent-texte); }
+.corps-onglets i { position: absolute; top: 3px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--fatigue-moyenne); }
 
 /* ------------------------------------------------------------ séance */
 .progression { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin-top: -8px; }
