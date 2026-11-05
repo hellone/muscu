@@ -1,7 +1,7 @@
 "use client";
 // Côté téléphone : appels API, séance en cours (gardée sur le téléphone, marche hors-ligne) et envois en attente.
 import { useSyncExternalStore } from "react";
-import type { PlanExo, SeanceHisto, SerieFaite } from "./coach";
+import type { InfoCycle, PlanExo, SeanceHisto, SerieFaite, TypeSerie } from "./coach";
 import { EXERCICES_PAR_ID } from "./exercices";
 
 export class ErreurApi extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -23,10 +23,14 @@ export async function api<T = any>(url: string, init: RequestInit & { json?: unk
 
 // ------------------------------------------------------------ séance en cours
 
-export interface SerieLocale { poids: number | null; reps: number; fait: boolean }
+export interface SerieLocale { poids: number | null; reps: number; fait: boolean; type?: TypeSerie; rir?: number | null }
 export interface ExoLocal extends Omit<PlanExo, "series"> { series: SerieLocale[] }
 /** passee = séance saisie après coup (pas de minuteur, pas de durée) ; modif = correction d'une séance déjà enregistrée. */
-export interface SeanceLocale { id: string; cible: string; nomCible: string; debut: string; exos: ExoLocal[]; actif: number; passee?: boolean; modif?: boolean }
+export interface OptionsSeance { rir: boolean; echauffement: boolean; cycle: InfoCycle | null }
+export interface SeanceLocale {
+  id: string; cible: string; nomCible: string; debut: string; exos: ExoLocal[]; actif: number; passee?: boolean; modif?: boolean;
+  options?: OptionsSeance;
+}
 
 const CLE = "muscu.seance";
 const CLE_ENVOIS = "muscu.envois";
@@ -71,10 +75,10 @@ export function nouvelId(): string {
   return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function demarrerSeance(cible: string, nomCible: string, plan: PlanExo[], debut?: string) {
+export function demarrerSeance(cible: string, nomCible: string, plan: PlanExo[], debut?: string, options?: OptionsSeance) {
   const d = debut ?? new Date().toISOString();
   ecrireSeance({
-    id: nouvelId(), cible, nomCible, debut: d, actif: plan.length ? 0 : -1, passee: estPassee(d),
+    id: nouvelId(), cible, nomCible, debut: d, actif: plan.length ? 0 : -1, passee: estPassee(d), options,
     exos: plan.map((p) => ({ ...p, series: p.series.map((s) => ({ ...s, fait: false })) })),
   });
   prechargerVisuels(plan.map((p) => p.exerciceId));
@@ -88,8 +92,8 @@ export function modifierSeanceEnregistree(s: SeanceHisto, nomCible: string) {
   ecrireSeance({
     id: s.id, cible: s.cible, nomCible, debut: s.debut, actif: -1, passee: true, modif: true,
     exos: s.exercices.map((e) => ({
-        exerciceId: e.exerciceId, raison: "", objectif: "", derniere: null, repos: 90,
-        series: e.series.map((x) => ({ poids: x.poids, reps: x.reps, fait: true })),
+        exerciceId: e.exerciceId, raison: "", objectif: "", derniere: null, repos: 90, groupe: e.groupe ?? null,
+        series: e.series.map((x) => ({ poids: x.poids, reps: x.reps, fait: true, type: x.type, rir: x.rir ?? null })),
     })),
   });
 }
@@ -114,12 +118,18 @@ export function prechargerVisuels(ids: string[]) {
 
 // ------------------------------------------------------------ envoi (avec file d'attente hors-ligne)
 
-interface SeanceEnvoi { id: string; cible: string; debut: string; fin?: string; exercices: { exerciceId: string; series: SerieFaite[] }[] }
+interface SeanceEnvoi { id: string; cible: string; debut: string; fin?: string; exercices: { exerciceId: string; series: SerieFaite[]; groupe?: number | null }[] }
 
 export function versEnvoi(s: SeanceLocale): SeanceEnvoi {
   return {
     id: s.id, cible: s.cible, debut: s.debut, fin: s.passee ? undefined : new Date().toISOString(),
-    exercices: s.exos.map((e) => ({ exerciceId: e.exerciceId, series: e.series.filter((x) => x.fait && x.reps > 0).map(({ poids, reps }) => ({ poids, reps })) }))
+    exercices: s.exos.map((e) => ({
+      exerciceId: e.exerciceId,
+      groupe: e.groupe ?? null,
+      series: e.series.filter((x) => x.fait && x.reps > 0).map(({ poids, reps, type, rir }) => ({
+        poids, reps, ...(type && type !== "normale" ? { type } : {}), ...(typeof rir === "number" ? { rir } : {}),
+      })),
+    }))
       .filter((e) => e.series.length),
   };
 }

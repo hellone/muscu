@@ -9,6 +9,9 @@ services:
     environment:
       - MUSCU_DATA=/data
       - CODE_INVITATION=${CODE_INVITATION:-}
+      - TZ=Europe/Paris                  # semaines du lundi au dimanche, heure de Paris
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID:-}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET:-}
     volumes:
       - ./data:/data          # base de données (comptes, séances) : à sauvegarder
     mem_limit: 384m

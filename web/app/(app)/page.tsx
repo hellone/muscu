@@ -3,11 +3,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Corps from "@/components/Corps";
-import { api, demarrerSeance, lireSeance, useSeance } from "@/lib/client";
-import type { PlanExo, Recuperation, Suggestion } from "@/lib/coach";
-import { CIBLES, LISTE_MUSCLES, MUSCLES, type CibleId } from "@/lib/muscles";
+import { api, demarrerSeance, type OptionsSeance, lireSeance, useSeance } from "@/lib/client";
+import type { InfoCycle, PlanExo, Recuperation, Suggestion } from "@/lib/coach";
+import { CIBLES, GROUPES, LISTE_MUSCLES, MUSCLES, type CibleId, type Muscle } from "@/lib/muscles";
 
-interface Coach { recuperation: Recuperation; suggestions: Suggestion[]; nbSeances: number }
+interface Coach {
+  recuperation: Recuperation; suggestions: Suggestion[]; nbSeances: number;
+  volume: Record<Muscle, number>; objectifs: Record<Muscle, number>; priorites: Muscle[];
+  regularite: { semaines: number; cetteSemaine: number; objectif: number }; cycle: InfoCycle | null;
+}
 
 export default function Accueil() {
   const router = useRouter();
@@ -25,8 +29,8 @@ export default function Accueil() {
     if (lireSeance() && !confirm("Une séance est déjà en cours. La remplacer ?")) return;
     setLancement(cible);
     try {
-      const r = await api<{ plan: PlanExo[] }>("/api/coach/seance", { method: "POST", json: { cible } });
-      demarrerSeance(cible, cible === "libre" ? "Séance libre" : CIBLES[cible].nom, r.plan);
+      const r = await api<{ plan: PlanExo[]; options: OptionsSeance }>("/api/coach/seance", { method: "POST", json: { cible } });
+      demarrerSeance(cible, cible === "libre" ? "Séance libre" : CIBLES[cible].nom, r.plan, undefined, r.options);
       router.push("/seance");
     } catch (e) {
       setErreur((e as Error).message);
@@ -46,6 +50,25 @@ export default function Accueil() {
         <p className="surtitre majuscule">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</p>
         <h1>Aujourd&apos;hui</h1>
       </header>
+
+      {coach && (
+        <div className="tuiles">
+          <div className="tuile">
+            <strong>🔥 {coach.regularite.semaines}</strong>
+            <small>semaine{coach.regularite.semaines > 1 ? "s" : ""} d&apos;affilée à {coach.regularite.objectif}+ séances</small>
+          </div>
+          <div className="tuile">
+            <strong>{coach.regularite.cetteSemaine}/{coach.regularite.objectif}</strong>
+            <small>séances cette semaine</small>
+          </div>
+          {coach.cycle && (
+            <div className={`tuile ${coach.cycle.decharge ? "decharge" : ""}`}>
+              <strong>{coach.cycle.decharge ? "🧘" : `S${coach.cycle.semaine}/${coach.cycle.total}`}</strong>
+              <small>{coach.cycle.decharge ? "semaine de décharge" : `cycle · RIR ${coach.cycle.rirCible}`}</small>
+            </div>
+          )}
+        </div>
+      )}
 
       {seance && (
         <Link href="/seance" className="bandeau-seance">
@@ -91,6 +114,8 @@ export default function Accueil() {
         )}
       </section>
 
+      {coach && coach.nbSeances > 0 && <VolumeSemaine coach={coach} />}
+
       {coach && (
         <section className="carte">
           <h2 className="titre-section">Récupération</h2>
@@ -116,5 +141,38 @@ export default function Accueil() {
         </section>
       )}
     </>
+  );
+}
+
+function VolumeSemaine({ coach }: { coach: Coach }) {
+  const [tout, setTout] = useState(false);
+  // muscles affichés : prioritaires + ceux déjà travaillés cette semaine (ou tous)
+  const groupes = GROUPES.map((g) => ({
+    nom: g.nom,
+    muscles: g.muscles.filter((m) => tout || coach.priorites.includes(m) || coach.volume[m] > 0),
+  })).filter((g) => g.muscles.length);
+  return (
+    <section className="carte">
+      <h2 className="titre-section">Volume de la semaine <small>séries par muscle</small></h2>
+      {groupes.length === 0 && <p className="discret">Aucune série depuis lundi.</p>}
+      {groupes.map((g) => (
+        <div key={g.nom} className="volume-groupe">
+          <h3>{g.nom}</h3>
+          <ul className="liste-volume">
+            {g.muscles.map((m) => {
+              const v = coach.volume[m], o = coach.objectifs[m];
+              return (
+                <li key={m} className={v >= o ? "atteint" : ""}>
+                  <span>{MUSCLES[m].nom}{coach.priorites.includes(m) && <b title="Prioritaire"> ★</b>}</span>
+                  <div className="barre"><div style={{ width: `${Math.min(100, (v / o) * 100)}%` }} /></div>
+                  <small>{String(v).replace(".", ",")}/{o}</small>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+      <button className="lien-discret" onClick={() => setTout(!tout)}>{tout ? "Masquer les muscles non travaillés" : "Voir tous les muscles"}</button>
+    </section>
   );
 }

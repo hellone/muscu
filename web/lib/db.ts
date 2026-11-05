@@ -40,7 +40,51 @@ CREATE TABLE IF NOT EXISTS seance_exos (
   PRIMARY KEY (seance_id, ordre)
 );
 CREATE INDEX IF NOT EXISTS seance_exos_exercice ON seance_exos(exercice_id);
+-- Communauté : abonnements (je suis X), j'aime, commentaires
+CREATE TABLE IF NOT EXISTS abonnements (
+  suiveur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  suivi_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  cree_le TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (suiveur_id, suivi_id)
+);
+CREATE TABLE IF NOT EXISTS likes (
+  seance_id TEXT NOT NULL REFERENCES seances(id) ON DELETE CASCADE,
+  utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  PRIMARY KEY (seance_id, utilisateur_id)
+);
+CREATE TABLE IF NOT EXISTS commentaires (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  seance_id TEXT NOT NULL REFERENCES seances(id) ON DELETE CASCADE,
+  utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  texte TEXT NOT NULL,
+  cree_le TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS commentaires_seance ON commentaires(seance_id);
+-- Connexion Strava (jetons OAuth)
+CREATE TABLE IF NOT EXISTS strava (
+  utilisateur_id INTEGER PRIMARY KEY REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  athlete_id TEXT,
+  nom TEXT,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expire_le INTEGER NOT NULL,
+  auto INTEGER NOT NULL DEFAULT 1
+);
 `;
+
+/** Colonnes ajoutées après la première version (bases existantes). */
+const COLONNES: [table: string, colonne: string, definition: string][] = [
+  ["utilisateurs", "reglages", "TEXT NOT NULL DEFAULT '{}'"],
+  ["seance_exos", "groupe", "INTEGER"],
+  ["seances", "strava_id", "TEXT"],
+];
+
+function migrer(d: DatabaseSync) {
+  for (const [t, c, def] of COLONNES) {
+    const cols = (d.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((x) => x.name);
+    if (!cols.includes(c)) d.exec(`ALTER TABLE ${t} ADD COLUMN ${c} ${def}`);
+  }
+}
 
 const g = globalThis as unknown as { __muscuDb?: DatabaseSync };
 
@@ -51,6 +95,7 @@ export function db(): DatabaseSync {
   const d = new DatabaseSync(path.join(dir, "muscu.db"));
   d.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;");
   d.exec(SCHEMA);
+  migrer(d);
   g.__muscuDb = d;
   return d;
 }

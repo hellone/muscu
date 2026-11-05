@@ -15,6 +15,7 @@ RUN npm run build
 # ---- exécution (image légère)
 FROM node:22-alpine
 WORKDIR /app
+RUN apk add --no-cache tzdata
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 MUSCU_DATA=/data
 RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app && mkdir -p /data && chown app:app /data
 COPY --from=build /app/.next/standalone ./

@@ -31,7 +31,7 @@ export default function DetailSeance() {
               <section key={i} className="carte">
                 <Link href={`/exercices/${e.exerciceId}`} className="titre-exo">{ex?.nom ?? e.exerciceId} →</Link>
                 <ol className="series-faites">
-                  {e.series.map((x, j) => <li key={j}>{x.poids !== null ? `${fmtPoids(x.poids)} kg × ` : ""}{x.reps}{ex?.unite === "sec" ? " s" : " reps"}</li>)}
+                  {e.series.map((x, j) => <li key={j}>{x.type === "echauffement" ? "Échauffement : " : x.type === "degressive" ? "Dégressive : " : x.type === "echec" ? "À l'échec : " : ""}{x.poids !== null ? `${fmtPoids(x.poids)} kg × ` : ""}{x.reps}{ex?.unite === "sec" ? " s" : " reps"}{typeof x.rir === "number" ? ` · RIR ${x.rir}` : ""}</li>)}
                 </ol>
               </section>
             );

@@ -105,3 +105,67 @@ test("alternatives : même muscle, pas déjà dans la séance", () => {
   assert.ok(alt.length > 3);
   assert.ok(alt.every((e) => e.cible === "pectoraux" && e.id !== "di-halteres"));
 });
+
+// ------------------------------------------------------------------ v3
+import { grouperSupersets, meilleurRecord, proposerSeries as proposer, regularite, semaineCycle, volumeSemaine, seriesParMuscle } from "../lib/coach.ts";
+
+test("cycle de 5 semaines : RIR 3 → 0 puis décharge, puis recommence", () => {
+  const debut = "2026-11-02T00:00:00.000Z";
+  const rirs = [0, 1, 2, 3, 4, 5].map((k) => semaineCycle(debut, 5, Date.parse(debut) + (k * 7 + 1) * J));
+  assert.deepEqual(rirs.map((c) => c!.rirCible), [3, 2, 1, 0, 4, 3]);
+  assert.deepEqual(rirs.map((c) => c!.decharge), [false, false, false, false, true, false]);
+});
+
+test("décharge : moins de séries et charge -10 %", () => {
+  const e = EXERCICES_PAR_ID["dc-barre"];
+  const p = proposer(e, { series: [8, 8, 8, 8].map((reps) => ({ poids: 80, reps })) }, { semaine: 5, total: 5, decharge: true, rirCible: 4 });
+  assert.equal(p.series.length, 2);
+  assert.equal(p.series[0].poids, 72.5);
+});
+
+test("RIR : très facile (3+ en réserve) → on monte la charge même sans être au max", () => {
+  const e = EXERCICES_PAR_ID["dc-barre"];
+  const p = proposer(e, { series: [8, 8, 8, 8].map((reps) => ({ poids: 80, reps, rir: 4 })) });
+  assert.equal(p.series[0].poids, 82.5);
+});
+
+test("échauffement : séries d'approche sur le premier mouvement lourd, exclues des comptes", () => {
+  const h = [seance("pecs_triceps", 4, ["dc-barre"], 80, 8)];
+  const plan = genererSeance("pecs_triceps", h, { equipement: SALLE, echauffement: true });
+  const dc = plan.find((p) => p.exerciceId === "dc-barre")!;
+  assert.deepEqual(dc.series.slice(0, 2).map((s) => s.type), ["echauffement", "echauffement"]);
+  assert.equal(dc.series[0].poids, 40);
+  const s: SeanceHisto = { id: "x", debut: ilYa(0), cible: "pecs_triceps", exercices: [{ exerciceId: "dc-barre", series: [{ poids: 40, reps: 10, type: "echauffement" }, { poids: 80, reps: 8 }] }] };
+  assert.equal(seriesParMuscle(s).get("pectoraux"), 1);
+});
+
+test("supersets automatiques : biceps/triceps enchaînés, jamais les mouvements lourds", () => {
+  const plan = genererSeance("bras", [], { equipement: SALLE, supersets: true });
+  const groupes = plan.filter((p) => p.groupe);
+  assert.ok(groupes.length >= 2);
+  for (const p of groupes) assert.equal(EXERCICES_PAR_ID[p.exerciceId].niveau, 3);
+  // les deux membres d'un superset sont adjacents et de muscles opposés
+  for (let i = 0; i < plan.length - 1; i++) {
+    if (plan[i].groupe && plan[i].groupe === plan[i + 1].groupe) {
+      const m = [EXERCICES_PAR_ID[plan[i].exerciceId].cible, EXERCICES_PAR_ID[plan[i + 1].exerciceId].cible].sort().join("+");
+      assert.ok(["biceps+triceps", "abdos+avant_bras"].includes(m) || m.includes("biceps") || m.includes("triceps"), m);
+    }
+  }
+  const { groupes: g } = grouperSupersets([EXERCICES_PAR_ID["dc-barre"], EXERCICES_PAR_ID["curl-barre"], EXERCICES_PAR_ID["extension-poulie"]]);
+  assert.deepEqual(g, [null, 1, 1]);
+});
+
+test("muscles prioritaires : un exercice de plus", () => {
+  const sans = genererSeance("pecs_triceps", [], { equipement: SALLE }).filter((p) => EXERCICES_PAR_ID[p.exerciceId].cible === "epaules_lat").length;
+  const avec = genererSeance("pecs_triceps", [], { equipement: SALLE, priorites: ["epaules_lat"] }).filter((p) => EXERCICES_PAR_ID[p.exerciceId].cible === "epaules_lat").length;
+  assert.equal(avec, sans + 1);
+});
+
+test("record et régularité", () => {
+  const h = [seance("pecs_triceps", 10, ["dc-barre"], 70, 8), seance("pecs_triceps", 3, ["dc-barre"], 80, 6)];
+  const r = meilleurRecord(h, "dc-barre")!;
+  assert.equal(r.poids, 80);
+  const reg = regularite([seance("a", 0, ["dc-barre"]), seance("b", 7, ["dc-barre"]), seance("c", 8, ["dc-barre"])], 1, maintenant);
+  assert.ok(reg.semaines >= 2);
+  assert.ok(volumeSemaine([seance("a", 0, ["dc-barre"])], maintenant).pectoraux >= 4);
+});

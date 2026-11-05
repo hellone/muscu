@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Feuille from "@/components/Feuille";
-import { api, demarrerSeance, fmtDate, lireSeance, nbEnvoisEnAttente } from "@/lib/client";
+import OngletsMoi from "@/components/OngletsMoi";
+import { api, demarrerSeance, type OptionsSeance, fmtDate, lireSeance, nbEnvoisEnAttente } from "@/lib/client";
 import type { PlanExo } from "@/lib/coach";
 import { LISTE_CIBLES } from "@/lib/muscles";
 
@@ -22,6 +23,7 @@ export default function Historique() {
   return (
     <>
       <header className="entete"><p className="surtitre">{semaine.length} séance{semaine.length > 1 ? "s" : ""} ces 7 derniers jours</p><h1>Historique</h1></header>
+      <OngletsMoi />
       <button className="bouton secondaire large" onClick={() => setSaisie(true)}>+ Saisir une séance passée</button>
       {saisie && <SaisiePassee onFermer={() => setSaisie(false)} />}
       {attente > 0 && <p className="info">{attente} séance(s) en attente d&apos;envoi (pas de réseau). Elles partiront automatiquement.</p>}
@@ -64,8 +66,8 @@ function SaisiePassee({ onFermer }: { onFermer: () => void }) {
     setEnvoi(true); setErreur("");
     try {
       // le plan proposé tient compte de ce que tu avais fait AVANT cette date (charges, variété)
-      const r = await api<{ plan: PlanExo[] }>("/api/coach/seance", { method: "POST", json: { cible, avant: debut } });
-      demarrerSeance(cible, LISTE_CIBLES.find((c) => c.id === cible)?.nom ?? "Séance libre", r.plan, debut);
+      const r = await api<{ plan: PlanExo[]; options: OptionsSeance }>("/api/coach/seance", { method: "POST", json: { cible, avant: debut } });
+      demarrerSeance(cible, LISTE_CIBLES.find((c) => c.id === cible)?.nom ?? "Séance libre", r.plan, debut, { ...r.options, echauffement: false });
       router.push("/seance");
     } catch (err) {
       setErreur((err as Error).message);

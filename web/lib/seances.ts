@@ -10,15 +10,16 @@ export function historique(utilisateurId: number): SeanceHisto[] {
   const seances = db().prepare("SELECT id, cible, debut FROM seances WHERE utilisateur_id = ? ORDER BY debut DESC").all(utilisateurId) as any[];
   if (!seances.length) return [];
   const exos = db().prepare(
-    `SELECT e.seance_id, e.exercice_id, e.series FROM seance_exos e JOIN seances s ON s.id = e.seance_id
+    `SELECT e.seance_id, e.exercice_id, e.series, e.groupe FROM seance_exos e JOIN seances s ON s.id = e.seance_id
      WHERE s.utilisateur_id = ? ORDER BY e.seance_id, e.ordre`,
   ).all(utilisateurId) as any[];
   const parSeance = new Map<string, SeanceHisto>(seances.map((s) => [s.id, { id: s.id, cible: s.cible, debut: s.debut, exercices: [] }]));
-  for (const e of exos) parSeance.get(e.seance_id)?.exercices.push({ exerciceId: e.exercice_id, series: JSON.parse(e.series) });
+  for (const e of exos) parSeance.get(e.seance_id)?.exercices.push({ exerciceId: e.exercice_id, series: JSON.parse(e.series), groupe: e.groupe ?? null });
   return [...parSeance.values()];
 }
 
-export interface SeanceRecue { id: string; cible: string; debut: string; fin?: string; exercices: { exerciceId: string; series: SerieFaite[] }[] }
+export interface SeanceRecue { id: string; cible: string; debut: string; fin?: string; exercices: { exerciceId: string; series: SerieFaite[]; groupe?: number | null }[] }
+const TYPES = ["normale", "echauffement", "degressive", "echec"];
 
 const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
@@ -33,8 +34,17 @@ export function enregistrer(utilisateurId: number, s: SeanceRecue) {
     .filter((e) => EXERCICES_PAR_ID[e?.exerciceId])
     .map((e) => ({
       exerciceId: e.exerciceId,
-      series: (Array.isArray(e.series) ? e.series : []).slice(0, 20)
-        .map((x) => ({ poids: typeof x?.poids === "number" && isFinite(x.poids) && x.poids >= 0 && x.poids < 1000 ? Math.round(x.poids * 100) / 100 : null, reps: Math.max(0, Math.min(999, Math.round(Number(x?.reps) || 0))) }))
+      groupe: Number.isInteger(e.groupe) && (e.groupe as number) > 0 && (e.groupe as number) < 100 ? (e.groupe as number) : null,
+      series: (Array.isArray(e.series) ? e.series : []).slice(0, 25)
+        .map((x) => {
+          const serie: SerieFaite = {
+            poids: typeof x?.poids === "number" && isFinite(x.poids) && x.poids >= 0 && x.poids < 1000 ? Math.round(x.poids * 100) / 100 : null,
+            reps: Math.max(0, Math.min(999, Math.round(Number(x?.reps) || 0))),
+          };
+          if (typeof x?.type === "string" && TYPES.includes(x.type) && x.type !== "normale") serie.type = x.type as SerieFaite["type"];
+          if (typeof x?.rir === "number" && Number.isInteger(x.rir) && x.rir >= 0 && x.rir <= 5) serie.rir = x.rir;
+          return serie;
+        })
         .filter((x) => x.reps > 0),
     }))
     .filter((e) => e.series.length > 0);
@@ -47,16 +57,17 @@ export function enregistrer(utilisateurId: number, s: SeanceRecue) {
        ON CONFLICT(id) DO UPDATE SET cible = excluded.cible, debut = excluded.debut, fin = excluded.fin, maj_le = datetime('now')`,
     ).run(s.id, utilisateurId, s.cible, s.debut, typeof s.fin === "string" && ISO.test(s.fin) ? s.fin : null);
     db().prepare("DELETE FROM seance_exos WHERE seance_id = ?").run(s.id);
-    const ins = db().prepare("INSERT INTO seance_exos (seance_id, ordre, exercice_id, series) VALUES (?,?,?,?)");
-    exos.forEach((e, i) => ins.run(s.id, i, e.exerciceId, JSON.stringify(e.series)));
+    const ins = db().prepare("INSERT INTO seance_exos (seance_id, ordre, exercice_id, series, groupe) VALUES (?,?,?,?,?)");
+    exos.forEach((e, i) => ins.run(s.id, i, e.exerciceId, JSON.stringify(e.series), e.groupe));
   });
+  return { nouvelle: !existant };
 }
 
 export interface ResumeSeance { id: string; cible: string; nomCible: string; debut: string; fin: string | null; nbExos: number; nbSeries: number; tonnage: number }
 
 export function listeSeances(utilisateurId: number): ResumeSeance[] {
   return historiqueAvecFin(utilisateurId).map(({ s, fin }) => {
-    const series = s.exercices.flatMap((e) => e.series);
+    const series = s.exercices.flatMap((e) => e.series).filter((x) => x.type !== "echauffement");
     return {
       id: s.id, cible: s.cible, nomCible: CIBLES[s.cible as CibleId]?.nom ?? "Séance libre", debut: s.debut, fin,
       nbExos: s.exercices.length, nbSeries: series.length,

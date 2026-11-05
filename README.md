@@ -17,6 +17,13 @@ construit l'enchaînement optimal et retient tes charges pour te faire progresse
 - **Hors-ligne** : la séance en cours est gardée sur le téléphone ; si le réseau manque à la fin, elle est envoyée
   automatiquement au retour du réseau.
 - **Comptes** : identifiant + mot de passe, une session par appareil (1 an). Code d'invitation optionnel.
+- **Séries typées** : échauffement, dégressive, jusqu'à l'échec (toucher le numéro de la série). Séries d'approche
+  proposées automatiquement avant les mouvements lourds + échauffement articulaire de 5 min.
+- **Supersets** : regroupement automatique des isolations de muscles opposés, ou manuel (« Superset avec le suivant »).
+- **RIR** (reps en réserve, optionnel) et **cycles** de 4 à 6 semaines avec semaine de décharge ; **muscles prioritaires**.
+- **Records** (🏆), comparaison vert/rouge avec la dernière fois, **volume hebdomadaire** par muscle, **série de semaines** 🔥.
+- **Communauté** : suivre des amis, fil des séances, « Bravo », commentaires, classement de la semaine.
+- **Strava** : envoi automatique des séances (voir plus bas).
 
 ## Structure
 
@@ -64,6 +71,16 @@ Traefik (celui de n8n, réseau `n8n_default`) obtient le certificat HTTPS automa
 | `MUSCU_DOMAIN` | Domaine de l'appli | `muscu.courtside-basket.fr` |
 | `CODE_INVITATION` | Code demandé à l'inscription (vide = inscription libre) | vide |
 | `MUSCU_DATA` | Dossier de la base SQLite | `./data` |
+
+## Strava (facultatif)
+
+1. Sur https://www.strava.com/settings/api, crée une application :
+   - *Application Name* : Muscu ; *Category* : Training ; *Website* : https://muscu.courtside-basket.fr
+   - *Authorization Callback Domain* : `muscu.courtside-basket.fr`
+2. Copie le *Client ID* et le *Client Secret* dans `.env` (`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`), puis `bash deploy.sh`.
+3. Dans l'appli : Moi → Réglages → Strava → « Connecter Strava ». Chaque séance terminée devient une activité « Musculation ».
+
+Une application Strava non validée accepte 1 athlète (toi) : suffisant pour un usage perso.
 
 ## Ajuster le coach
 
