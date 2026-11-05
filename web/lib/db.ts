@@ -60,23 +60,12 @@ CREATE TABLE IF NOT EXISTS commentaires (
   cree_le TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS commentaires_seance ON commentaires(seance_id);
--- Connexion Strava (jetons OAuth)
-CREATE TABLE IF NOT EXISTS strava (
-  utilisateur_id INTEGER PRIMARY KEY REFERENCES utilisateurs(id) ON DELETE CASCADE,
-  athlete_id TEXT,
-  nom TEXT,
-  access_token TEXT NOT NULL,
-  refresh_token TEXT NOT NULL,
-  expire_le INTEGER NOT NULL,
-  auto INTEGER NOT NULL DEFAULT 1
-);
 `;
 
 /** Colonnes ajoutées après la première version (bases existantes). */
 const COLONNES: [table: string, colonne: string, definition: string][] = [
   ["utilisateurs", "reglages", "TEXT NOT NULL DEFAULT '{}'"],
   ["seance_exos", "groupe", "INTEGER"],
-  ["seances", "strava_id", "TEXT"],
 ];
 
 function migrer(d: DatabaseSync) {

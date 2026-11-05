@@ -2,11 +2,10 @@ import { db } from "@/lib/db";
 import { ErreurMetier } from "@/lib/auth";
 import { EQUIPEMENTS } from "@/lib/exercices";
 import { lireReglages } from "@/lib/reglages";
-import { etatStrava } from "@/lib/strava";
 import { lireJson, route } from "@/lib/api";
 
 export async function GET() {
-  return route((u) => Response.json({ ...u, strava: etatStrava(u.id) }));
+  return route((u) => Response.json(u));
 }
 
 export async function PATCH(req: Request) {

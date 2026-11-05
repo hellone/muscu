@@ -1,6 +1,5 @@
 "use client";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import OngletsMoi from "@/components/OngletsMoi";
 import { api } from "@/lib/client";
 import { EQUIPEMENTS, LISTE_EQUIPEMENTS, PRESETS, type Equipement } from "@/lib/exercices";
@@ -9,25 +8,12 @@ import type { Reglages } from "@/lib/reglages";
 
 interface Moi {
   identifiant: string; nom: string; equipement: Equipement[]; reglages: Reglages;
-  strava: { configure: boolean; connecte: boolean; nom: string | null; auto: boolean };
 }
 
-const MSG_STRAVA: Record<string, string> = {
-  ok: "Strava est connecté : tes prochaines séances y seront envoyées automatiquement.",
-  refuse: "Connexion Strava annulée.",
-  droits: "Il faut autoriser Muscu à créer des activités sur Strava (case à cocher sur la page Strava).",
-  erreur: "La connexion à Strava a échoué. Réessaie dans un instant.",
-  "non-configure": "Strava n'est pas encore configuré sur le serveur (voir le README).",
-};
 
 export default function PageReglages() {
-  return <Suspense><Reglages_ /></Suspense>;
-}
-
-function Reglages_() {
-  const params = useSearchParams();
   const [moi, setMoi] = useState<Moi | null>(null);
-  const [msg, setMsg] = useState(MSG_STRAVA[params.get("strava") ?? ""] ?? "");
+  const [msg, setMsg] = useState("");
   const [mdp, setMdp] = useState({ ancien: "", nouveau: "" });
   const charger = () => api<Moi>("/api/compte").then(setMoi).catch(() => {});
   useEffect(() => { charger(); }, []);
@@ -153,24 +139,6 @@ function Reglages_() {
         <div className="options">
           <Interrupteur k="partage" titre="Partager mes séances" detail="Les personnes qui te suivent voient tes séances dans leur fil et le classement." />
         </div>
-      </section>
-
-      <section className="carte">
-        <h2 className="titre-section">Strava</h2>
-        {!moi ? null : !moi.strava.configure ? (
-          <p className="discret">Strava n&apos;est pas encore configuré sur le serveur. Il faut créer une application API Strava et renseigner STRAVA_CLIENT_ID et STRAVA_CLIENT_SECRET (voir le README).</p>
-        ) : moi.strava.connecte ? (
-          <div className="options">
-            <p className="discret">Connecté{moi.strava.nom ? ` en tant que ${moi.strava.nom}` : ""}.</p>
-            <label className={`option-ligne ${moi.strava.auto ? "coche" : ""}`}>
-              <span><strong>Envoyer mes séances</strong><small>Chaque séance terminée devient une activité « Musculation » sur Strava.</small></span>
-              <input type="checkbox" className="bascule" checked={moi.strava.auto} onChange={async () => { await api("/api/strava", { method: "PATCH", json: { auto: !moi.strava.auto } }); charger(); }} />
-            </label>
-            <button className="bouton discret danger" onClick={async () => { await api("/api/strava", { method: "DELETE" }); charger(); setMsg("Strava déconnecté."); }}>Déconnecter Strava</button>
-          </div>
-        ) : (
-          <a className="bouton strava large" href="/api/strava/connexion">Connecter Strava</a>
-        )}
       </section>
 
       <section className="carte">
